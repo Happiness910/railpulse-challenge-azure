@@ -197,9 +197,17 @@ def fetch_and_store_station(station_name):
             )
 
 
-
             cursor.execute(
                 """
+                IF NOT EXISTS
+                (
+                    SELECT 1
+                    FROM liveboard_records
+                    WHERE
+                        station_id = ?
+                        AND vehicle_id = ?
+                        AND departure_time = ?
+                )
                 INSERT INTO liveboard_records
                 (
                     station_id,
@@ -212,6 +220,12 @@ def fetch_and_store_station(station_name):
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    # Vérification de l'existence
+                    station_id,
+                    vehicle_id,
+                    departure_time,
+
+                    # Valeurs à insérer
                     station_id,
                     vehicle_id,
                     destination,
