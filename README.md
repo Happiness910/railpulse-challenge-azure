@@ -1,5 +1,15 @@
 # 🚉 RailPulse: Azure Serverless Liveboard Ingestion Pipeline
 
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+
+![Azure Functions](https://img.shields.io/badge/Azure-Functions-0078D4)
+
+![Azure SQL](https://img.shields.io/badge/Azure-SQL-0089D6)
+
+![Serverless](https://img.shields.io/badge/Architecture-Serverless-success)
+
+![ETL](https://img.shields.io/badge/Data-ETL-orange)
+
 ## Project Overview
 
 RailPulse is a cloud-native data engineering project designed to collect, process and store real-time railway operational data from the Belgian SNCB/NMBS network.
@@ -8,6 +18,23 @@ This project represents the second stage of the RailwayPulse platform, where the
 
 The solution was built using Azure Functions running on a Consumption Plan, ensuring automatic scaling while remaining within the Azure for Students free tier.
 
+### Azure Resource Group
+
+The project resources are deployed inside a dedicated Azure Resource Group.
+
+![Azure Resource Group](docs/images/resource-group.png)
+
+### Azure Function App
+
+The serverless ingestion pipeline is hosted in an Azure Function App running on the Consumption Plan.
+
+![Function App Overview](docs/images/function-app-overview.png)
+
+### Azure SQL Database
+
+The project stores historical railway data in an Azure SQL Database running in Serverless mode.
+
+![Azure SQL Database](docs/images/sql-database-overview.png)
 ---
 
 # Objectives
@@ -79,6 +106,7 @@ The database runs in **Serverless** mode with **automatic pause** enabled to min
 
 The Function App uses the **Consumption Plan**, allowing executions only when requests or scheduled triggers occur.
 
+
 ---
 
 # ETL Pipeline
@@ -94,10 +122,9 @@ The retrieved JSON includes information such as:
 * station
 * train identifier
 * destination
-* scheduled departure time
+* departure time
 * delay
 * platform
-* cancellation status
 
 ---
 
@@ -119,11 +146,50 @@ The transformed data is inserted into Azure SQL using parameterized SQL statemen
 
 The relational model separates operational entities into dedicated tables to avoid redundancy and improve query performance.
 
+The following screenshot shows historical liveboard records successfully stored in Azure SQL.
+
+![Sample Data](docs/images/sample-data.png)
+
 ---
 
 # Database Schema
 
 The database follows a normalized relational design.
+
+The Azure SQL database contains three normalized tables.
+
+![Database Tables](docs/images/database-tables.png)
+
+## Entity Relationship Diagram
+
+```mermaid
+erDiagram
+
+STATIONS ||--o{ LIVEBOARD_RECORDS : contains
+
+VEHICLES ||--o{ LIVEBOARD_RECORDS : operates
+
+STATIONS {
+    int station_id PK
+    string name
+}
+
+VEHICLES {
+    int vehicle_id PK
+    string name
+}
+
+LIVEBOARD_RECORDS {
+    int record_id PK
+    int station_id FK
+    int vehicle_id FK
+    string destination
+    datetime departure_time
+    int delay_minutes
+    string platform
+    datetime created_at
+}
+```
 
 Main tables:
 
@@ -134,7 +200,7 @@ Stores railway station metadata.
 | Column       | Description  |
 | ------------ | ------------ |
 | station_id   | Primary Key  |
-| station_name | Station name |
+| name         | Station name |
 
 ---
 
@@ -145,7 +211,7 @@ Stores train identifiers.
 | Column       | Description      |
 | ------------ | ---------------- |
 | vehicle_id   | Primary Key      |
-| vehicle_name | Train identifier |
+| name         | Train identifier |
 
 ---
 
@@ -162,9 +228,8 @@ Each record references:
 along with operational information such as:
 
 * destination
-* delay
+* delay_minutes
 * platform
-* cancellation status
 
 Foreign keys guarantee referential integrity between all tables.
 
@@ -189,6 +254,10 @@ The ingestion pipeline can therefore run safely every 15–30 minutes while pres
 # Automation
 
 The project includes two Azure Function triggers.
+
+The Function App exposes both an HTTP Trigger for manual execution and a Timer Trigger for automated scheduled ingestion.
+
+![Functions List](docs/images/functions-list.png)
 
 ## HTTP Trigger
 
@@ -215,7 +284,30 @@ Sensitive credentials are never stored in source code.
 
 Database connection strings are securely managed using Azure Application Settings and accessed through environment variables.
 
+The following Application Settings are configured in Azure. Sensitive values are hidden.
+
+![Application Settings](docs/images/application-settings.png)
+
 This approach follows cloud security best practices while keeping the repository safe for publication.
+
+### Required Application Settings
+
+| Variable | Description |
+|-----------|-------------|
+| DB_SERVER | Azure SQL Server hostname |
+| DB_DATABASE | Database name |
+| DB_USERNAME | SQL login |
+| DB_PASSWORD | SQL password |
+
+---
+
+# Monitoring
+
+Application Insights is used to monitor Azure Function executions and request activity over time.
+
+The following chart illustrates successful request activity captured by Application Insights.
+
+![Application Insights](docs/images/application-insights-request-trend.png)
 
 ---
 
@@ -238,14 +330,56 @@ Implemented optimizations include:
 
 ```
 railpulse-challenge-azure/
-
+├── docs/
+│   └── images/
 ├── function_app.py
 ├── schema.sql
 ├── host.json
 ├── requirements.txt
 ├── .gitignore
-└── venv/
+└── README.md
 ```
+
+Sensitive files such as local.settings.json and environment files are excluded through .gitignore.
+
+---
+
+# Deployment Guide
+
+The project can be deployed in a few steps.
+
+1. Create an Azure SQL Server.
+2. Create an Azure SQL Database using the Serverless tier.
+3. Execute `schema.sql`.
+4. Create an Azure Function App (Python 3.10, Consumption Plan).
+5. Configure the required Application Settings.
+6. Publish the Function App using Azure Functions Core Tools.
+7. Test the HTTP Trigger.
+8. Enable the Timer Trigger for automated ingestion.
+
+---
+
+# Troubleshooting
+
+## Azure SQL connection issues
+
+- Verify firewall rules.
+- Check Application Settings.
+- Ensure the SQL Server is running.
+
+## Function not triggering
+
+- Check Timer Trigger CRON expression.
+- Review Application Insights logs.
+
+## Duplicate records
+
+- Verify the UNIQUE constraint:
+(station_id, vehicle_id, departure_time)
+
+## Serverless database delay
+
+- Azure SQL Serverless may require a few seconds to resume after automatic pause.
 
 ---
 
@@ -254,7 +388,7 @@ railpulse-challenge-azure/
 Clone the repository.
 
 ```
-git clone <repository-url>
+git clone https://github.com/happiness910/railpulse-challenge-azure.git
 ```
 
 Create a virtual environment.
@@ -272,6 +406,8 @@ pip install -r requirements.txt
 Configure the required Azure Application Settings or local environment variables.
 
 Deploy the Function App using Azure Functions Core Tools or directly through the Azure Portal.
+
+For Azure deployment, configure the required Application Settings before publishing the Function App.
 
 ---
 
@@ -328,7 +464,7 @@ The project demonstrates practical skills in:
 ---
 # ⏱️ Timeline
 
-This project took 2 days for completion.
+This project was completed in **2 days**.
 
 ---
 
