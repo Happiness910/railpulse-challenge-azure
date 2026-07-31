@@ -324,3 +324,15 @@ The project demonstrates practical skills in:
 * Serverless Computing
 * Python
 * SQL
+
+---
+# ⏱️ Timeline
+
+This project took 2 days for completion.
+
+---
+
+# 📌 Personal Situation
+This project was done as part of the AI & Data Science Bootcamp at BeCode.
+
+[LinkedIn - Iness Khatiri](https://www.linkedin.com/in/iness-khatiri-14392a258)
